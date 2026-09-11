@@ -1,0 +1,44 @@
+# Build
+dir}
+build/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln
+*.vcxproj*
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# JUCE generated
+JuceHeader.h
+*/JuceLibraryCode/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Misc
+*.zip
+*.tar.gz

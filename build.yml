@@ -1,0 +1,105 @@
+name: Build VST3
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: Windows-x64
+            os: windows-latest
+            cmake_generator: "Visual Studio 17 2022"
+            cmake_arch: x64
+            artifact_name: BalancEQ_Windows_x64
+            vst3_path: build/BalancEQ_artefacts/Release/VST3/BalancEQ.vst3
+
+          - name: macOS-x64
+            os: macos-13
+            cmake_generator: "Xcode"
+            cmake_arch: x86_64
+            artifact_name: BalancEQ_macOS_x64
+            vst3_path: build/BalancEQ_artefacts/Release/VST3/BalancEQ.vst3
+
+          - name: macOS-ARM64
+            os: macos-latest
+            cmake_generator: "Xcode"
+            cmake_arch: arm64
+            artifact_name: BalancEQ_macOS_ARM64
+            vst3_path: build/BalancEQ_artefacts/Release/VST3/BalancEQ.vst3
+
+          - name: Linux-x64
+            os: ubuntu-latest
+            cmake_generator: "Unix Makefiles"
+            cmake_arch: ""
+            artifact_name: BalancEQ_Linux_x64
+            vst3_path: build/BalancEQ_artefacts/Release/VST3/BalancEQ.vst3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libfreetype6-dev libasound2-dev libgl1-mesa-dev
+
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: build/_deps/juce-src
+          key: juce-7.0.12-${{ matrix.config.os }}-${{ matrix.config.cmake_arch }}
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G "${{ matrix.config.cmake_generator }}" \
+            -DCMAKE_BUILD_TYPE=Release \
+            ${{ matrix.config.cmake_arch != '' && format('-A {0}', matrix.config.cmake_arch) || '' }}
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target BalancEQ_VST3
+
+      - name: Upload VST3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.config.artifact_name }}
+          path: ${{ matrix.config.vst3_path }}
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create ZIP archives
+        run: |
+          cd artifacts
+          for dir in */; do
+            zip -r "${dir%/}.zip" "$dir"
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip
+          generate_release_notes: true
